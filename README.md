@@ -246,6 +246,110 @@ news.ycombinator.com (REAL)
    Monthly Savings:    $11,557.63
 ```
 
+### Run LLM Action Demo
+
+Test that Predicate snapshots work for real browser automation with an LLM.
+
+**Setup:**
+
+1. Copy the example env file:
+```bash
+cp .env.example .env
+```
+
+2. Edit `.env` and add your OpenAI API key:
+```bash
+# .env
+OPENAI_API_KEY=sk-your-openai-api-key-here
+
+# Optional: for ML-ranked snapshots
+PREDICATE_API_KEY=sk-your-predicate-api-key-here
+```
+
+3. Run the demo:
+```bash
+npm run demo:llm
+
+# With visible browser and element overlay (for debugging)
+npm run demo:llm -- --headed --overlay
+```
+
+**Alternative LLM providers:**
+```bash
+# Anthropic Claude
+ANTHROPIC_API_KEY=sk-... npm run demo:llm
+
+# Local LLM (Ollama)
+SENTIENCE_LOCAL_LLM_BASE_URL=http://localhost:11434/v1 npm run demo:llm
+```
+
+**Flags:**
+- `--headed` - Run browser in visible window (not headless)
+- `--overlay` - Show green borders around captured elements (requires `--headed`)
+
+This demo compares:
+- **Tokens**: A11y tree vs Predicate snapshot input size
+- **Latency**: Total time including LLM response
+- **Success**: Whether the LLM correctly identifies the target element
+
+**Example output:**
+```
+======================================================================
+ LLM Browser Navigation COMPARISON: A11y Tree vs. Predicate Snapshot
+======================================================================
+Using OpenAI provider
+Model: gpt-4o-mini
+Running in headed mode (visible browser window)
+Overlay enabled: elements will be highlighted with green borders
+Predicate snapshots: REAL (ML-ranked)
+======================================================================
+
+Task: Click first news link on HN
+
+  [A11y Tree] Click first news link on HN
+    Chose element: 48
+    Tokens: 35191, Latency: 3932ms
+  [Predicate] Click first news link on HN
+    Chose element: 48
+    Tokens: 864, Latency: 2477ms
+
+Task: Click More link on HN
+
+  [A11y Tree] Click More link on HN
+    Chose element: 1199
+    Tokens: 35179, Latency: 2366ms
+  [Predicate] Click More link on HN
+    Chose element: 11
+    Tokens: 861, Latency: 1979ms
+
+Task: Click search on Example.com
+
+  [A11y Tree] Click search on Example.com
+    Chose element: 7
+    Tokens: 272, Latency: 492ms
+  [Predicate] Click search on Example.com
+    Chose element: 6
+    Tokens: 44, Latency: 6255ms
+
+======================================================================
+ RESULTS SUMMARY
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Metric              │ A11y Tree        │ Predicate        │ Δ       │
+├─────────────────────────────────────────────────────────────────────┤
+│ Total Tokens        │            70642 │             1769 │ -97%    │
+│ Avg Tokens/Task     │            23547 │              590 │         │
+│ Total Latency (ms)  │             6790 │            10711 │ -58%    │
+│ Success Rate        │              3/3 │              3/3 │         │
+└─────────────────────────────────────────────────────────────────────┘
+
+Key Insight: Predicate snapshots use ~97% fewer tokens
+while achieving the same task success rate.
+```
+
+> **Note:** Latency includes network time for ML ranking via the Predicate gateway. Token savings translate directly to cost savings—97% fewer tokens = 97% lower LLM costs.
+
 ### Build
 
 ```bash
@@ -267,7 +371,8 @@ predicate-snapshot-skill/
 │   ├── snapshot.ts   # PredicateSnapshotTool implementation
 │   └── act.ts        # PredicateActTool implementation
 ├── demo/
-│   └── compare.ts    # Token comparison demo
+│   ├── compare.ts    # Token comparison demo
+│   └── llm-action.ts # LLM action comparison demo
 ├── SKILL.md          # OpenClaw skill manifest
 └── package.json
 ```
