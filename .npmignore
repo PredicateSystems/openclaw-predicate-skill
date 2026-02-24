@@ -1,0 +1,25 @@
+# Source files (dist is published instead)
+src/
+
+# Development files
+demo/
+*.ts
+!*.d.ts
+tsconfig.json
+jest.config.js
+
+# Test files
+__tests__/
+coverage/
+
+# IDE
+.idea/
+.vscode/
+
+# Git
+.git/
+.gitignore
+
+# Misc
+*.log
+.env*
