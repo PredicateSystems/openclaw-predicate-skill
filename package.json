@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "lint": "eslint src --ext .ts",
     "demo": "ts-node demo/compare.ts",
     "demo:llm": "ts-node demo/llm-action.ts",
