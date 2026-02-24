@@ -1,68 +1,101 @@
 # Predicate Snapshot Skill for OpenClaw
 
-ML-powered DOM pruning that reduces browser prompt tokens by **97%** while preserving actionable elements.
+ML-powered DOM pruning that reduces browser prompt tokens by **up to 99.8%** while preserving actionable elements.
 
 ## Overview
 
-This OpenClaw skill replaces the default accessibility tree snapshot with Predicate's ML-ranked DOM elements. Instead of sending 800+ elements (~18,000 tokens) to the LLM, it sends only the 50 most relevant elements (~500 tokens).
+This OpenClaw skill replaces the default accessibility tree snapshot with Predicate's ML-ranked DOM elements. Instead of sending 800+ elements (~18,000 tokens) to the LLM, it sends only the 50 most relevant elements (configurable) (~500 tokens).
 
 ### Real-World Demo Results
 
-Tested on bot-friendly sites with the included demo (`npm run demo`):
+Tested with the included demo (`npm run demo`):
 
-| Site | A11y Tree | Predicate | Savings |
+| Site | OpenClaw Snapshot (A11y Tree) | Predicate Snapshot | Savings |
 |------|-----------|-----------|---------|
+| slickdeals.net | 598,301 tokens (24,567 elements) | 1,283 tokens (50 elements) | **99.8%** |
 | news.ycombinator.com | 16,484 tokens (681 elements) | 587 tokens (50 elements) | **96%** |
 | example.com | 305 tokens (12 elements) | 164 tokens (4 elements) | **46%** |
 | httpbin.org/html | 1,590 tokens (34 elements) | 164 tokens (4 elements) | **90%** |
-| **Total** | **18,379 tokens** | **915 tokens** | **95%** |
+| **Total** | **616,680 tokens** | **2,198 tokens** | **99.6%** |
 
-> Note: Simple pages like example.com have minimal elements, so savings are lower. Complex pages like Hacker News show the full benefit.
+> Ad-heavy sites like slickdeals.net show the most dramatic savings—from 598K tokens down to just 1.3K tokens. Simple pages like example.com have minimal elements, so savings are lower.
 
 ### Summary
 
-| Approach | Tokens | Elements | Signal Quality |
+| Approach | Tokens (avg) | Elements | Signal Quality |
 |----------|--------|----------|----------------|
-| Accessibility Tree | ~18,000 | ~800 | Low (noise) |
-| Predicate Snapshot | ~500-900 | 50 | High (ML-ranked) |
+| Accessibility Tree | ~150,000+ | ~6,000+ | Low (noise) |
+| Predicate Snapshot | ~500-1,300 | 50 | High (ML-ranked) |
 
-## Installation
+## Quick Start
 
-### Via ClawHub (Recommended)
+### 1. Install the Skill
 
+**Via ClawHub (Recommended):**
 ```bash
 npx clawdhub@latest install predicate-snapshot
 ```
 
-### Manual Installation
-
+**Manual Installation:**
 ```bash
-git clone https://github.com/predicate-systems/predicate-snapshot-skill ~/.openclaw/skills/predicate-snapshot
+git clone https://github.com/PredicateSystems/openclaw-predicate-skill ~/.openclaw/skills/predicate-snapshot
 cd ~/.openclaw/skills/predicate-snapshot
 npm install
 npm run build
 ```
 
-## Configuration
+### 2. Get Your API Key
 
-### API Key
+1. Go to [PredicateSystems.ai](https://www.PredicateSystems.ai)
+2. Sign up for a free account (includes 500 free credits/month)
+3. Navigate to **Settings > API Keys**
+4. Click **Create New Key** and copy your key (starts with `sk-...`)
 
-Get your free API key at [predicate.systems/keys](https://predicate.systems/keys)
+### 3. Configure the API Key
 
-Set via environment variable:
-
+**Option A: Environment Variable (Recommended)**
 ```bash
-export PREDICATE_API_KEY="sk-..."
+# Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
+export PREDICATE_API_KEY="sk-your-key-here"
 ```
 
-Or in `~/.openclaw/config.yaml`:
+**Option B: OpenClaw Config File**
 
+Add to `~/.openclaw/config.yaml`:
 ```yaml
 skills:
   predicate-snapshot:
-    api_key: "sk-..."
-    max_credits_per_session: 100
+    api_key: "sk-your-key-here"
+    max_credits_per_session: 100  # Optional: limit credits per session
 ```
+
+### 4. Verify Installation
+
+```bash
+# In OpenClaw, run:
+/predicate-snapshot
+```
+
+If configured correctly, you'll see a ranked list of page elements.
+
+## How It Works
+
+### Does This Replace the Default A11y Tree?
+
+**No, this skill does not automatically replace OpenClaw's default accessibility tree.** Instead, it provides an alternative snapshot command that you can use when you want better element ranking.
+
+| Command | What It Does |
+|---------|--------------|
+| Default OpenClaw | Uses raw accessibility tree (~18,000 tokens) |
+| `/predicate-snapshot` | Uses ML-ranked Predicate snapshot (~500 tokens) |
+| `/predicate-snapshot-local` | Uses local heuristic ranking (free, no API) |
+
+**To use Predicate snapshots in your workflow:**
+1. Use `/predicate-snapshot` instead of the default page observation
+2. Use `/predicate-act click <ID>` to interact with elements by their ID
+3. The element IDs from Predicate snapshots work with `/predicate-act`
+
+**Future:** OpenClaw may add configuration to set Predicate as the default snapshot provider.
 
 ## Usage
 
@@ -120,16 +153,6 @@ Uses heuristic ranking without ML API calls. Lower accuracy but no credits consu
 | DG | Dominant group identifier |
 | href | Link URL if applicable |
 
-## Pricing
-
-| Tier | Credits/Month | Price |
-|------|---------------|-------|
-| Hobby | 500 | Free |
-| Builder | 20,000 | $19/mo |
-| Pro | 40,000 | $49/mo |
-| Teams | 120,000 | $149/mo |
-| Enterprise | Custom | Contact us |
-
 Each ML-powered snapshot consumes 1 credit. Local snapshots are free.
 
 ## Development
@@ -137,6 +160,8 @@ Each ML-powered snapshot consumes 1 credit. Local snapshots are free.
 ### Run Demo
 
 Compare token usage between accessibility tree and Predicate snapshot:
+
+Get free credits for testing at https://www.PredicateSystems.ai
 
 ```bash
 # With API key (REAL ML-ranked snapshots)
@@ -171,13 +196,13 @@ news.ycombinator.com (REAL)
   +---------------------------------------------------------+
 
 ======================================================================
- TOTAL: 18,379 -> 915 tokens (95% reduction)
+ TOTAL: 616,680 -> 2,198 tokens (99.6% reduction)
 ======================================================================
 
- MONTHLY COST PROJECTION (5,000 tasks, Claude Sonnet)
-   Accessibility Tree: $1.38
-   Predicate Snapshot: $0.07
-   Monthly Savings:    $1.31
+ MONTHLY COST PROJECTION (5,000 tasks × 5 snapshots = 25,000 snapshots)
+   Accessibility Tree: $11,562.75 (LLM tokens only)
+   Predicate Snapshot: $5.12 ($1.37 LLM + $3.75 API)
+   Monthly Savings:    $11,557.63
 ```
 
 ### Build
@@ -218,5 +243,5 @@ predicate-snapshot-skill/
 ## Support
 
 - Documentation: [predicate.systems/docs](https://predicate.systems/docs)
-- Issues: [GitHub Issues](https://github.com/predicate-systems/predicate-snapshot-skill/issues)
+- Issues: [GitHub Issues](https://github.com/PredicateSystems/openclaw-predicate-skill/issues)
 - Discord: [Predicate Community](https://discord.gg/predicate)

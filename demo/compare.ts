@@ -232,11 +232,12 @@ async function simulatePredicateSnapshot(
 async function runDemo(): Promise<void> {
   const apiKey = process.env.PREDICATE_API_KEY;
 
-  // Use bot-friendly sites
+  // Test sites: mix of simple, complex, and ad-heavy pages
   const testUrls = [
     'https://news.ycombinator.com',
     'https://example.com',
     'https://httpbin.org/html',
+    'https://slickdeals.net',  // Ad-heavy site to show real-world benefits
   ];
 
   console.log('='.repeat(70));
