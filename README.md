@@ -388,6 +388,5 @@ predicate-snapshot-skill/
 
 ## Support
 
-- Documentation: [predicate.systems/docs](https://predicate.systems/docs)
+- Documentation: [predicatesystems.ai/docs](https://predicatesystems.ai/docs)
 - Issues: [GitHub Issues](https://github.com/PredicateSystems/openclaw-predicate-skill/issues)
-- Discord: [Predicate Community](https://discord.gg/predicate)
