@@ -20,6 +20,47 @@ Tested with the included demo (`npm run demo`):
 
 > Ad-heavy sites like slickdeals.net show the most dramatic savings—from 598K tokens down to just 1.3K tokens. Simple pages like example.com have minimal elements, so savings are lower.
 
+### Why Fewer Elements Is Better
+
+You might wonder: "Isn't 50 elements vs 24,567 elements comparing apples to oranges?"
+
+**No—and here's why:**
+
+1. **Most elements are noise.** Of those 24,567 elements on slickdeals.net, the vast majority are:
+   - Ad iframes and tracking pixels
+   - Hidden elements and overlays
+   - Decorative containers (`<div>`, `<span>`)
+   - Non-interactive text nodes
+   - Duplicate/redundant elements
+
+2. **LLMs need actionable elements and enough context to reason.** For browser automation, the agent needs to:
+   - Click buttons and links
+   - Fill form fields
+   - Read key content for decision-making
+
+   Predicate's ML ranking identifies the ~50 most relevant elements—including both interactive controls and contextual text—while filtering out the noise.
+
+3. **More elements = worse performance.** Sending 600K tokens to an LLM causes:
+   - Higher latency (slower responses)
+   - Higher cost ($11K+/month vs $5/month)
+   - Context window overflow on complex pages
+   - More hallucinations from irrelevant context
+
+4. **Quality over quantity.** Predicate's snapshot includes:
+   - ML-ranked importance scores
+   - Dominant group detection (for ordinal tasks like "click 3rd item")
+   - Visual cues (is_primary, position)
+   - Semantic role information
+
+   This structured context helps LLMs make better decisions than a raw element dump.
+
+**The goal isn't to preserve all elements—it's to preserve the right elements.**
+
+### Proven in Production
+
+- **Small local LLM model (3B) success**: The Predicate Snapshot engine powered a complex browser automation task using only a 3B parameter local model—[featured on Hacker News front page](https://news.ycombinator.com/item?id=46790127)
+- **Deep dive**: Read why the accessibility tree alone isn't enough for web automation: [Why A11y Alone Isn't Enough](https://predicatesystems.ai/blog/why-ax-alone-isnt-enough)
+
 ### Summary
 
 | Approach | Tokens (avg) | Elements | Signal Quality |
@@ -47,8 +88,8 @@ npm run build
 ### 2. Get Your API Key
 
 1. Go to [PredicateSystems.ai](https://www.PredicateSystems.ai)
-2. Sign up for a free account (includes 500 free credits/month)
-3. Navigate to **Settings > API Keys**
+2. Sign up for a **free account (includes 500 free credits/month)**
+3. Navigate to **Dashboard > API Keys**
 4. Click **Create New Key** and copy your key (starts with `sk-...`)
 
 ### 3. Configure the API Key
