@@ -2,6 +2,62 @@
 
 ML-powered DOM pruning that reduces browser prompt tokens by **up to 99.8%** while preserving actionable elements.
 
+## Quick Start
+
+### 1. Install the Skill
+
+**Via ClawHub (Recommended):**
+```bash
+npx clawdhub@latest install predicate-snapshot
+```
+
+**Manual Installation:**
+```bash
+git clone https://github.com/PredicateSystems/openclaw-predicate-skill ~/.openclaw/skills/predicate-snapshot
+cd ~/.openclaw/skills/predicate-snapshot
+npm install
+npm run build
+```
+
+### 2. Get Your API Key (Optional)
+
+For ML-powered ranking (95% token reduction), get a free API key:
+
+1. Go to [PredicateSystems.ai](https://www.PredicateSystems.ai)
+2. Sign up for a **free account (includes 500 free credits/month)**
+3. Navigate to **Dashboard > API Keys**
+4. Click **Create New Key** and copy your key (starts with `sk-...`)
+
+**Without API key:** Local heuristic-based pruning (~80% token reduction)
+**With API key:** ML-powered ranking for cleaner output (~95% token reduction)
+
+### 3. Configure the API Key
+
+**Option A: Environment Variable (Recommended)**
+```bash
+# Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
+export PREDICATE_API_KEY="sk-your-key-here"
+```
+
+**Option B: OpenClaw Config File**
+
+Add to `~/.openclaw/config.yaml`:
+```yaml
+skills:
+  predicate-snapshot:
+    api_key: "sk-your-key-here"
+    max_credits_per_session: 100  # Optional: limit credits per session
+```
+
+### 4. Use the Skill
+
+```bash
+# In OpenClaw:
+/predicate-snapshot              # Get ranked elements
+/predicate-act click 42          # Click element by ID
+/predicate-snapshot-local        # Free local mode (no API)
+```
+
 ## Overview
 
 This OpenClaw skill replaces the default accessibility tree snapshot with Predicate's ML-ranked DOM elements. Instead of sending 800+ elements (~18,000 tokens) to the LLM, it sends only the 50 most relevant elements (configurable) (~500 tokens).
@@ -67,57 +123,6 @@ You might wonder: "Isn't 50 elements vs 24,567 elements comparing apples to oran
 |----------|--------|----------|----------------|
 | Accessibility Tree | ~150,000+ | ~6,000+ | Low (noise) |
 | Predicate Snapshot | ~500-1,300 | 50 | High (ML-ranked) |
-
-## Quick Start
-
-### 1. Install the Skill
-
-**Via ClawHub (Recommended):**
-```bash
-npx clawdhub@latest install predicate-snapshot
-```
-
-**Manual Installation:**
-```bash
-git clone https://github.com/PredicateSystems/openclaw-predicate-skill ~/.openclaw/skills/predicate-snapshot
-cd ~/.openclaw/skills/predicate-snapshot
-npm install
-npm run build
-```
-
-### 2. Get Your API Key
-
-1. Go to [PredicateSystems.ai](https://www.PredicateSystems.ai)
-2. Sign up for a **free account (includes 500 free credits/month)**
-3. Navigate to **Dashboard > API Keys**
-4. Click **Create New Key** and copy your key (starts with `sk-...`)
-
-### 3. Configure the API Key
-
-**Option A: Environment Variable (Recommended)**
-```bash
-# Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
-export PREDICATE_API_KEY="sk-your-key-here"
-```
-
-**Option B: OpenClaw Config File**
-
-Add to `~/.openclaw/config.yaml`:
-```yaml
-skills:
-  predicate-snapshot:
-    api_key: "sk-your-key-here"
-    max_credits_per_session: 100  # Optional: limit credits per session
-```
-
-### 4. Verify Installation
-
-```bash
-# In OpenClaw, run:
-/predicate-snapshot
-```
-
-If configured correctly, you'll see a ranked list of page elements.
 
 ## How It Works
 
@@ -468,6 +473,32 @@ npm run build
 npm test
 ```
 
+## Why Predicate Snapshot Over Accessibility Tree?
+
+OpenClaw and similar browser automation frameworks default to the **Accessibility Tree (A11y)** for navigating websites. While A11y works for simple cases, it has fundamental limitations that make it unreliable for production LLM-driven automation:
+
+### A11y Tree Limitations
+
+| Problem | Description | Impact on LLM Agents |
+|---------|-------------|----------------------|
+| **Optimized for Consumption, Not Action** | A11y is designed for assistive technology (screen readers), not action verification or layout reasoning | Lacks precise semantic geometry and ordinality (e.g., "the first item in a list") that agents need for reliable reasoning |
+| **Hydration Lag & Structural Inconsistency** | In JS-heavy SPAs, A11y often lags behind hydration or misrepresents dynamic overlays and grouping | Snapshots miss interactive nodes or incorrectly label states (e.g., confusing `focused` with `active`) |
+| **Shadow DOM & Iframe Blind Spots** | A11y struggles to maintain global order across Shadow DOM and iframe boundaries | Cross-shadow ARIA delegation is inconsistent; iframe contents are often missing or lose spatial context |
+| **Token Inefficiency** | Extracting the entire A11y tree for small actions wastes context window and compute | Superfluous nodes (like `genericContainer`) consume tokens without helping the agent |
+| **Missing Visual/Layout Bugs** | A11y trees miss rendering-time issues like overlapping buttons or z-index conflicts | Agent reports elements as "correct" but cannot detect visual collisions |
+
+### Predicate Snapshot Advantages
+
+| Capability | How Predicate Solves It |
+|------------|------------------------|
+| **Post-Rendered Geometry** | Layers in actual bounding boxes and grouping missing from standard A11y representations |
+| **Live DOM Synchronization** | Anchors on the live, post-rendered DOM ensuring perfect sync with actual page state |
+| **Unified Cross-Boundary Grounding** | Rust/WASM engine prunes and ranks elements across Shadow DOM and iframes, maintaining unified element ordering |
+| **Token-Efficient Pruning** | Specifically prunes uninformative branches while preserving all interactive elements, enabling 3B parameter models to perform at larger model levels |
+| **Deterministic Verification** | Binds intent to deterministic outcomes via snapshot diff, providing an auditable "truth" layer rather than just a structural "report" |
+
+> **Bottom Line:** A11y trees tell you what *should* be there. Predicate Snapshots tell you what *is* there—and prove it.
+
 ## Architecture
 
 ```
@@ -495,31 +526,7 @@ predicate-snapshot-skill/
 
 ## Support
 
-- Documentation: [predicatesystems.ai/docs](https://predicatesystems.ai/docs)
-- Issues: [GitHub Issues](https://github.com/PredicateSystems/openclaw-predicate-skill/issues)
-
-## Why Predicate Snapshot Over Accessibility Tree?
-
-OpenClaw and similar browser automation frameworks default to the **Accessibility Tree (A11y)** for navigating websites. While A11y works for simple cases, it has fundamental limitations that make it unreliable for production LLM-driven automation:
-
-### A11y Tree Limitations
-
-| Problem | Description | Impact on LLM Agents |
-|---------|-------------|----------------------|
-| **Optimized for Consumption, Not Action** | A11y is designed for assistive technology (screen readers), not action verification or layout reasoning | Lacks precise semantic geometry and ordinality (e.g., "the first item in a list") that agents need for reliable reasoning |
-| **Hydration Lag & Structural Inconsistency** | In JS-heavy SPAs, A11y often lags behind hydration or misrepresents dynamic overlays and grouping | Snapshots miss interactive nodes or incorrectly label states (e.g., confusing `focused` with `active`) |
-| **Shadow DOM & Iframe Blind Spots** | A11y struggles to maintain global order across Shadow DOM and iframe boundaries | Cross-shadow ARIA delegation is inconsistent; iframe contents are often missing or lose spatial context |
-| **Token Inefficiency** | Extracting the entire A11y tree for small actions wastes context window and compute | Superfluous nodes (like `genericContainer`) consume tokens without helping the agent |
-| **Missing Visual/Layout Bugs** | A11y trees miss rendering-time issues like overlapping buttons or z-index conflicts | Agent reports elements as "correct" but cannot detect visual collisions |
-
-### Predicate Snapshot Advantages
-
-| Capability | How Predicate Solves It |
-|------------|------------------------|
-| **Post-Rendered Geometry** | Layers in actual bounding boxes and grouping missing from standard A11y representations |
-| **Live DOM Synchronization** | Anchors on the live, post-rendered DOM ensuring perfect sync with actual page state |
-| **Unified Cross-Boundary Grounding** | Rust/WASM engine prunes and ranks elements across Shadow DOM and iframes, maintaining unified element ordering |
-| **Token-Efficient Pruning** | Specifically prunes uninformative branches while preserving all interactive elements, enabling 3B parameter models to perform at larger model levels |
-| **Deterministic Verification** | Binds intent to deterministic outcomes via snapshot diff, providing an auditable "truth" layer rather than just a structural "report" |
-
-> **Bottom Line:** A11y trees tell you what *should* be there. Predicate Snapshots tell you what *is* there—and prove it.
+- **ClawHub:** [clawhub.ai/rcholic/predicate-snapshot](https://clawhub.ai/rcholic/predicate-snapshot)
+- **GitHub:** [github.com/PredicateSystems/openclaw-predicate-skill](https://github.com/PredicateSystems/openclaw-predicate-skill)
+- **Documentation:** [predicatesystems.ai/docs](https://predicatesystems.ai/docs)
+- **Issues:** [GitHub Issues](https://github.com/PredicateSystems/openclaw-predicate-skill/issues)
