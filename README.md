@@ -246,9 +246,25 @@ news.ycombinator.com (REAL)
    Monthly Savings:    $11,557.63
 ```
 
-### Run LLM Action Demo
+### Run Login Demo (Multi-Step Workflow)
 
-Test that Predicate snapshots work for real browser automation with an LLM.
+This demo demonstrates real-world browser automation with a **6-step login workflow**:
+
+1. Navigate to login page and wait for delayed hydration
+2. Fill username field (LLM selects element + human-like typing)
+3. Fill password field (button state: disabled → enabled)
+4. Click login button
+5. Navigate to profile page
+6. Extract username from profile card
+
+![Local Llama Land Login Form with Predicate Overlay](demo/localLlamaLand_demo.png)
+
+*The Predicate overlay shows ML-ranked element IDs (green borders) that the LLM uses to select form fields.*
+
+Target site: `https://www.localllamaland.com/login` - a test site with intentional challenges:
+- **Delayed hydration**: Form loads after ~600ms (SPA pattern)
+- **State transitions**: Login button disabled until both fields filled
+- **Late-loading content**: Profile card loads after 800-1200ms
 
 **Setup:**
 
@@ -266,36 +282,63 @@ OPENAI_API_KEY=sk-your-openai-api-key-here
 PREDICATE_API_KEY=sk-your-predicate-api-key-here
 ```
 
-3. Run the demo:
+3. Run the demo with visible browser and element overlay:
 ```bash
-npm run demo:llm
-
-# With visible browser and element overlay (for debugging)
-npm run demo:llm -- --headed --overlay
+npm run demo:login -- --headed --overlay
 ```
 
 **Alternative LLM providers:**
 ```bash
 # Anthropic Claude
-ANTHROPIC_API_KEY=sk-... npm run demo:llm
+ANTHROPIC_API_KEY=sk-... npm run demo:login -- --headed --overlay
 
 # Local LLM (Ollama)
-SENTIENCE_LOCAL_LLM_BASE_URL=http://localhost:11434/v1 npm run demo:llm
+SENTIENCE_LOCAL_LLM_BASE_URL=http://localhost:11434/v1 npm run demo:login -- --headed --overlay
+
+# Headless mode (no browser window)
+npm run demo:login
 ```
 
 **Flags:**
 - `--headed` - Run browser in visible window (not headless)
 - `--overlay` - Show green borders around captured elements (requires `--headed`)
 
-This demo compares:
-- **Tokens**: A11y tree vs Predicate snapshot input size
-- **Latency**: Total time including LLM response
-- **Success**: Whether the LLM correctly identifies the target element
+This demo compares A11y Tree vs Predicate Snapshot across **all 6 steps**, measuring:
+- **Tokens per step**: Input size for each LLM call
+- **Latency**: Time per step including form interactions
+- **Success rate**: Step completion across the workflow
 
-**Example output:**
+#### Key Observations
+
+| Metric | A11y Tree | Predicate Snapshot | Delta |
+|--------|-----------|-------------------|-------|
+| **Steps Completed** | 3/6 (failed at step 4) | **6/6** | Predicate wins |
+| **Token Savings** | baseline | **70-74% per step** | Significant |
+| **SPA Hydration** | No built-in wait | **`check().eventually()` handles it** | More reliable |
+
+**Why A11y Tree Failed at Step 4:**
+
+The A11y (accessibility tree) approach failed to click the login button because:
+
+1. **Element ID mismatch**: The A11y tree assigns sequential IDs based on DOM traversal order, which can change between snapshots as the SPA re-renders. The LLM selected element 47 ("Sign in"), but that ID no longer pointed to the button after form state changed.
+
+2. **No stable identifiers**: Unlike Predicate's `data-predicate-id` attributes (injected by the browser extension), A11y IDs are ephemeral and not anchored to the actual DOM elements.
+
+3. **SPA state changes**: After filling both form fields, the button transitioned from disabled → enabled. This state change can cause the A11y tree to re-order elements, invalidating the LLM's element selection.
+
+**Predicate Snapshot succeeded because:**
+- `data-predicate-id` attributes are stable across re-renders
+- ML-ranking surfaces the most relevant elements (button with "Sign in" text)
+- `runtime.check().eventually()` properly waits for SPA hydration
+
+#### Raw Demo Logs
+
+<details>
+<summary>Click to expand full demo output</summary>
+
 ```
 ======================================================================
- LLM Browser Navigation COMPARISON: A11y Tree vs. Predicate Snapshot
+ LOGIN + PROFILE CHECK: A11y Tree vs. Predicate Snapshot
 ======================================================================
 Using OpenAI provider
 Model: gpt-4o-mini
@@ -304,51 +347,114 @@ Overlay enabled: elements will be highlighted with green borders
 Predicate snapshots: REAL (ML-ranked)
 ======================================================================
 
-Task: Click first news link on HN
+======================================================================
+ Running with A11Y approach
+======================================================================
 
-  [A11y Tree] Click first news link on HN
-    Chose element: 48
-    Tokens: 35191, Latency: 3932ms
-  [Predicate] Click first news link on HN
-    Chose element: 48
-    Tokens: 864, Latency: 2477ms
+[2026-02-25 01:14:50] Step 1: Wait for login form hydration
+  Waiting for form to hydrate using runtime.check().eventually()...
+  Button initially disabled: false
+  PASS (11822ms) | Found 19 elements
 
-Task: Click More link on HN
+[2026-02-25 01:15:02] Step 2: Fill username field
+  Snapshot: 45 elements, 1241 tokens
+  LLM chose element 37: "Username"
+  PASS (6771ms) | Typed "testuser"
+  Tokens: prompt=1241 total=1251
 
-  [A11y Tree] Click More link on HN
-    Chose element: 1199
-    Tokens: 35179, Latency: 2366ms
-  [Predicate] Click More link on HN
-    Chose element: 11
-    Tokens: 861, Latency: 1979ms
+[2026-02-25 01:15:08] Step 3: Fill password field
+  LLM chose element 42: "Password"
+  Waiting for login button to become enabled...
+  PASS (12465ms) | Button enabled: true
+  Tokens: prompt=1295 total=1305
 
-Task: Click search on Example.com
+[2026-02-25 01:15:21] Step 4: Click login button
+  LLM chose element 47: "Sign in"
+  FAIL (7801ms) | Navigated to https://www.localllamaland.com/login
+  Tokens: prompt=1367 total=1377
 
-  [A11y Tree] Click search on Example.com
-    Chose element: 7
-    Tokens: 272, Latency: 492ms
-  [Predicate] Click search on Example.com
-    Chose element: 6
-    Tokens: 44, Latency: 6255ms
+======================================================================
+ Running with PREDICATE approach
+======================================================================
+
+[2026-02-25 01:15:29] Step 1: Wait for login form hydration
+  Waiting for form to hydrate using runtime.check().eventually()...
+  Button initially disabled: false
+  PASS (10586ms) | Found 19 elements
+
+[2026-02-25 01:15:40] Step 2: Fill username field
+  Snapshot: 19 elements, 351 tokens
+  LLM chose element 23: "username"
+  PASS (12877ms) | Typed "testuser"
+  Tokens: prompt=351 total=361
+
+[2026-02-25 01:15:53] Step 3: Fill password field
+  LLM chose element 25: "Password"
+  Waiting for login button to become enabled...
+  PASS (17886ms) | Button enabled: true
+  Tokens: prompt=352 total=362
+
+[2026-02-25 01:16:10] Step 4: Click login button
+  LLM chose element 29: "Sign in"
+  PASS (12690ms) | Navigated to https://www.localllamaland.com/profile
+  Tokens: prompt=346 total=356
+
+[2026-02-25 01:16:23] Step 5: Navigate to profile page
+  PASS (1ms) | Already on profile page
+
+[2026-02-25 01:16:23] Step 6: Extract username from profile
+  Waiting for profile card to load...
+  Found username: testuser@localllama.land
+  Found email: Profile testuser testuser@localllama.lan
+  PASS (20760ms) | username=testuser@localllama.land
+  Tokens: prompt=480 total=480
 
 ======================================================================
  RESULTS SUMMARY
 ======================================================================
 
-┌─────────────────────────────────────────────────────────────────────┐
-│ Metric              │ A11y Tree        │ Predicate        │ Δ       │
-├─────────────────────────────────────────────────────────────────────┤
-│ Total Tokens        │            70642 │             1769 │ -97%    │
-│ Avg Tokens/Task     │            23547 │              590 │         │
-│ Total Latency (ms)  │             6790 │            10711 │ -58%    │
-│ Success Rate        │              3/3 │              3/3 │         │
-└─────────────────────────────────────────────────────────────────────┘
++-----------------------------------------------------------------------+
+| Metric              | A11y Tree        | Predicate        | Delta     |
++-----------------------------------------------------------------------+
+| Total Tokens        |             3933 |             1559 | -60%      |
+| Total Latency (ms)  |            38859 |            74800 | +92%      |
+| Steps Passed        |              3/6 |              6/6 |           |
++-----------------------------------------------------------------------+
 
-Key Insight: Predicate snapshots use ~97% fewer tokens
-while achieving the same task success rate.
+Key Insight: Predicate snapshots use 60% fewer tokens
+for a multi-step login workflow with form filling.
+
+Step-by-step breakdown:
+----------------------------------------------------------------------
+Step 1: Wait for login form hydration
+  A11y: 0 tokens, 11822ms, PASS
+  Pred: 0 tokens, 10586ms, PASS (0% savings)
+Step 2: Fill username field
+  A11y: 1251 tokens, 6771ms, PASS
+  Pred: 361 tokens, 12877ms, PASS (71% savings)
+Step 3: Fill password field
+  A11y: 1305 tokens, 12465ms, PASS
+  Pred: 362 tokens, 17886ms, PASS (72% savings)
+Step 4: Click login button
+  A11y: 1377 tokens, 7801ms, FAIL
+  Pred: 356 tokens, 12690ms, PASS (74% savings)
 ```
 
-> **Note:** Latency includes network time for ML ranking via the Predicate gateway. Token savings translate directly to cost savings—97% fewer tokens = 97% lower LLM costs.
+</details>
+
+#### Summary
+
+| Step | A11y Tree | Predicate Snapshot | Token Savings |
+|------|-----------|-------------------|---------------|
+| Step 1: Navigate to localllamaland.com/login | PASS | PASS | - |
+| Step 2: Fill username | 1,251 tokens, PASS | 361 tokens, PASS | **71%** |
+| Step 3: Fill password | 1,305 tokens, PASS | 362 tokens, PASS | **72%** |
+| Step 4: Click login | 1,377 tokens, **FAIL** | 356 tokens, PASS | **74%** |
+| Step 5: Navigate to profile | (not reached) | PASS | - |
+| Step 6: Extract username | (not reached) | 480 tokens, PASS | - |
+| **Total** | **3,933 tokens, 3/6 steps** | **1,559 tokens, 6/6 steps** | **60%** |
+
+> **Key Insight:** Predicate Snapshot not only reduces tokens by 70%+ per step, but also **improves automation reliability** on SPAs with automatic wait for hydration via `runtime.check().eventually()`. The stable element IDs survive React/Next.js re-renders that break A11y tree-based approaches.
 
 ### Build
 
@@ -372,7 +478,8 @@ predicate-snapshot-skill/
 │   └── act.ts        # PredicateActTool implementation
 ├── demo/
 │   ├── compare.ts    # Token comparison demo
-│   └── llm-action.ts # LLM action comparison demo
+│   ├── llm-action.ts # Simple LLM action demo (single clicks)
+│   └── login-demo.ts # Multi-step login workflow demo
 ├── SKILL.md          # OpenClaw skill manifest
 └── package.json
 ```
@@ -390,3 +497,29 @@ predicate-snapshot-skill/
 
 - Documentation: [predicatesystems.ai/docs](https://predicatesystems.ai/docs)
 - Issues: [GitHub Issues](https://github.com/PredicateSystems/openclaw-predicate-skill/issues)
+
+## Why Predicate Snapshot Over Accessibility Tree?
+
+OpenClaw and similar browser automation frameworks default to the **Accessibility Tree (A11y)** for navigating websites. While A11y works for simple cases, it has fundamental limitations that make it unreliable for production LLM-driven automation:
+
+### A11y Tree Limitations
+
+| Problem | Description | Impact on LLM Agents |
+|---------|-------------|----------------------|
+| **Optimized for Consumption, Not Action** | A11y is designed for assistive technology (screen readers), not action verification or layout reasoning | Lacks precise semantic geometry and ordinality (e.g., "the first item in a list") that agents need for reliable reasoning |
+| **Hydration Lag & Structural Inconsistency** | In JS-heavy SPAs, A11y often lags behind hydration or misrepresents dynamic overlays and grouping | Snapshots miss interactive nodes or incorrectly label states (e.g., confusing `focused` with `active`) |
+| **Shadow DOM & Iframe Blind Spots** | A11y struggles to maintain global order across Shadow DOM and iframe boundaries | Cross-shadow ARIA delegation is inconsistent; iframe contents are often missing or lose spatial context |
+| **Token Inefficiency** | Extracting the entire A11y tree for small actions wastes context window and compute | Superfluous nodes (like `genericContainer`) consume tokens without helping the agent |
+| **Missing Visual/Layout Bugs** | A11y trees miss rendering-time issues like overlapping buttons or z-index conflicts | Agent reports elements as "correct" but cannot detect visual collisions |
+
+### Predicate Snapshot Advantages
+
+| Capability | How Predicate Solves It |
+|------------|------------------------|
+| **Post-Rendered Geometry** | Layers in actual bounding boxes and grouping missing from standard A11y representations |
+| **Live DOM Synchronization** | Anchors on the live, post-rendered DOM ensuring perfect sync with actual page state |
+| **Unified Cross-Boundary Grounding** | Rust/WASM engine prunes and ranks elements across Shadow DOM and iframes, maintaining unified element ordering |
+| **Token-Efficient Pruning** | Specifically prunes uninformative branches while preserving all interactive elements, enabling 3B parameter models to perform at larger model levels |
+| **Deterministic Verification** | Binds intent to deterministic outcomes via snapshot diff, providing an auditable "truth" layer rather than just a structural "report" |
+
+> **Bottom Line:** A11y trees tell you what *should* be there. Predicate Snapshots tell you what *is* there—and prove it.

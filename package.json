@@ -11,6 +11,7 @@
     "lint": "eslint src --ext .ts",
     "demo": "ts-node demo/compare.ts",
     "demo:llm": "ts-node demo/llm-action.ts",
+    "demo:login": "ts-node demo/login-demo.ts",
     "prepublishOnly": "npm run build"
   },
   "bin": {

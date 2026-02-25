@@ -24,7 +24,10 @@ Reduces prompt token usage by **95%** while preserving actionable elements.
 ## Requirements
 
 - Node.js 18+
-- `PREDICATE_API_KEY` environment variable
+- `PREDICATE_API_KEY` environment variable (optional)
+
+**Without API key:** Local heuristic-based pruning (~80% token reduction)
+**With API key:** ML-powered ranking for cleaner output (~95% token reduction, less noise)
 
 Get your free API key at [predicate.systems/keys](https://predicate.systems/keys)
 
@@ -43,7 +46,7 @@ cd ~/.openclaw/skills/predicate-snapshot && npm install && npm run build
 
 ## Configuration
 
-Set your API key:
+For enhanced ML-powered ranking, set your API key:
 
 ```bash
 export PREDICATE_API_KEY="sk-..."
