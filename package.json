@@ -11,6 +11,7 @@
     "lint": "eslint src --ext .ts",
     "demo": "ts-node demo/compare.ts",
     "demo:llm": "ts-node demo/llm-action.ts",
+    "demo:login": "ts-node demo/login-demo.ts",
     "prepublishOnly": "npm run build"
   },
   "bin": {
@@ -33,7 +34,7 @@
   },
   "homepage": "https://predicate.systems/skills/snapshot",
   "dependencies": {
-    "@predicatesystems/runtime": "^1.1.2"
+    "@predicatesystems/runtime": "file:../sdk-ts"
   },
   "peerDependencies": {
     "playwright": "^1.40.0"
