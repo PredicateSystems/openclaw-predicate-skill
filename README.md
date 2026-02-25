@@ -138,6 +138,63 @@ If configured correctly, you'll see a ranked list of page elements.
 
 **Future:** OpenClaw may add configuration to set Predicate as the default snapshot provider.
 
+---
+
+## ⚡ Usage with Autonomous Agents
+
+> **Important:** OpenClaw agents work autonomously—they don't wait for manual slash commands. Here's how to integrate Predicate snapshots into autonomous workflows.
+
+### Option 1: Include in Task Instructions (Recommended)
+
+Add Predicate snapshot instructions directly in your task prompt:
+
+```
+Navigate to amazon.com and find the cheapest laptop under $500.
+
+IMPORTANT: For page observation, use /predicate-snapshot instead of the
+default accessibility tree. Use /predicate-act to interact with elements
+by their ID from the snapshot.
+```
+
+### Option 2: Modify Agent System Prompt
+
+For consistent usage across all tasks, add to your agent's system prompt:
+
+```
+## Browser Observation
+When observing web pages, always use /predicate-snapshot instead of the
+default accessibility tree. This provides ML-ranked elements optimized
+for efficient decision-making (~500 tokens vs ~18,000 tokens).
+
+To interact with page elements:
+1. Call /predicate-snapshot to get ranked elements with IDs
+2. Call /predicate-act <action> <element_id> to perform actions
+```
+
+### Option 3: OpenClaw Config (Future)
+
+OpenClaw may add support for setting the default snapshot provider:
+
+```yaml
+# ~/.openclaw/config.yaml (proposed future feature)
+browser:
+  snapshot_provider: predicate-snapshot
+```
+
+### Why This Matters
+
+Without explicit instructions, the agent will use OpenClaw's default accessibility tree, which:
+- Sends ~18,000 tokens per page observation
+- Includes thousands of irrelevant elements
+- Costs more and runs slower
+
+By instructing the agent to use `/predicate-snapshot`, you get:
+- ~500 tokens per observation (97% reduction)
+- Only the 50 most relevant elements
+- Faster, cheaper, more accurate automation
+
+---
+
 ## Usage
 
 ### Capture Snapshot
