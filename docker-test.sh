@@ -59,7 +59,12 @@ case "$TEST_MODE" in
         echo -e "${GREEN}Running: Skill MCP tools test${NC}"
         echo -e "${CYAN}This tests the skill's MCP tools and browser integration.${NC}"
         echo
-        docker run --rm -it \
+        # Use -t only if TTY is available
+        TTY_FLAG=""
+        if [ -t 0 ]; then TTY_FLAG="-t"; fi
+        # PredicateBrowser uses headless: false + --headless=new for extension support
+        # This works without xvfb
+        docker run --rm $TTY_FLAG \
             -e PREDICATE_API_KEY="${PREDICATE_API_KEY:-}" \
             -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
             -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
@@ -71,7 +76,9 @@ case "$TEST_MODE" in
         echo -e "${GREEN}Running: OpenClaw full runtime integration test${NC}"
         echo -e "${CYAN}This tests the skill through OpenClaw's CLI commands.${NC}"
         echo
-        docker run --rm -it \
+        TTY_FLAG=""
+        if [ -t 0 ]; then TTY_FLAG="-t"; fi
+        docker run --rm $TTY_FLAG \
             -e PREDICATE_API_KEY="${PREDICATE_API_KEY:-}" \
             -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
             -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
@@ -83,7 +90,9 @@ case "$TEST_MODE" in
         echo -e "${GREEN}Running: npm run ${TEST_MODE}${NC}"
         echo -e "${CYAN}This runs the demo script directly (SDK-level test).${NC}"
         echo
-        docker run --rm -it \
+        TTY_FLAG=""
+        if [ -t 0 ]; then TTY_FLAG="-t"; fi
+        docker run --rm $TTY_FLAG \
             -e PREDICATE_API_KEY="${PREDICATE_API_KEY:-}" \
             -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
             -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \

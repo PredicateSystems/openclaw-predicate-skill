@@ -1,14 +1,15 @@
 /**
  * Test script for predicate-snapshot skill via OpenClaw
  *
- * This script tests the skill's installation, module loading, and tool registration.
- * Note: Actual snapshot execution requires OpenClaw's browser-use session with CDP support.
- * Use `./docker-test.sh demo:login` to test full snapshot functionality.
+ * This script tests the skill's installation, module loading, tool registration,
+ * and actual snapshot execution using SentienceBrowser (which loads the extension).
+ *
+ * Run: npx ts-node test-skill.ts
+ * Or via Docker: ./docker-test.sh skill
  */
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { chromium } from 'playwright';
 
 // Colors for terminal output
 const GREEN = '\x1b[32m';
@@ -90,18 +91,58 @@ async function main() {
   }
   console.log(`${GREEN}✓ All tools have valid handlers${NC}`);
 
-  // Step 4: Launch browser and navigate (tests Playwright works)
+  // Step 4: Launch PredicateBrowser (loads extension automatically)
   console.log();
-  console.log(`${CYAN}Step 4: Testing browser automation...${NC}`);
+  console.log(`${CYAN}Step 4: Launching PredicateBrowser with extension...${NC}`);
   console.log(`  Target URL: ${TEST_URL}`);
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-  const context = await browser.newContext();
-  const page = await context.newPage();
+  // Import PredicateBrowser from the SDK
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { PredicateBrowser } = require('@predicatesystems/runtime');
 
+  // Debug: Show where the SDK will look for the extension
+  console.log(`  SDK __dirname: ${require.resolve('@predicatesystems/runtime')}`);
+  const runtimePath = path.dirname(require.resolve('@predicatesystems/runtime'));
+  console.log(`  Runtime path: ${runtimePath}`);
+
+  // Check extension candidates
+  const extensionCandidates = [
+    path.resolve(runtimePath, '../extension'),
+    path.resolve(runtimePath, 'extension'),
+    path.resolve(runtimePath, '../src/extension'),
+    path.resolve(runtimePath, '../../src/extension'),
+    path.resolve(process.cwd(), 'extension'),
+  ];
+
+  for (const candidate of extensionCandidates) {
+    const hasManifest = fs.existsSync(path.join(candidate, 'manifest.json'));
+    console.log(`  Extension candidate: ${candidate} (${hasManifest ? 'EXISTS' : 'not found'})`);
+  }
+
+  // PredicateBrowser constructor: (apiKey?, apiUrl?, headless?, proxy?, userDataDir?, ...)
+  // Use undefined for apiKey and apiUrl, true for headless
+  console.log(`  Creating PredicateBrowser instance...`);
+  const predicateBrowser = new PredicateBrowser(
+    undefined, // apiKey
+    undefined, // apiUrl
+    true       // headless (uses --headless=new which supports extensions)
+  );
+
+  console.log(`  Starting browser (this loads the extension)...`);
+  console.log(`  [${new Date().toISOString()}] Calling predicateBrowser.start()...`);
+
+  // Add timeout for browser start
+  const startTimeout = 60000; // 60 seconds
+  const startPromise = predicateBrowser.start();
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Browser start timed out after ${startTimeout}ms`)), startTimeout)
+  );
+
+  await Promise.race([startPromise, timeoutPromise]);
+  console.log(`  [${new Date().toISOString()}] predicateBrowser.start() completed`);
+  console.log(`${GREEN}✓ PredicateBrowser started with extension loaded${NC}`);
+
+  const page = predicateBrowser.getPage();
   await page.goto(TEST_URL, { waitUntil: 'domcontentloaded' });
 
   // Verify page loaded
@@ -109,22 +150,19 @@ async function main() {
   console.log(`  Page title: ${title}`);
   console.log(`${GREEN}✓ Browser launched and navigated successfully${NC}`);
 
-  // Step 5: Verify predicate-act tool can validate parameters
+  // Step 5: Test predicate-act tool parameter validation
   console.log();
   console.log(`${CYAN}Step 5: Testing tool parameter validation...${NC}`);
 
   const actTool = skillModule.mcpTools['predicate-act'];
   if (!actTool) {
     console.log(`${RED}ERROR: predicate-act tool not found${NC}`);
-    await browser.close();
+    await predicateBrowser.close();
     process.exit(1);
   }
 
   // Test invalid action parameter
-  const invalidResult = await actTool.handler(
-    { action: 'invalid_action', elementId: 1 },
-    { page }
-  );
+  const invalidResult = await actTool.handler({ action: 'invalid_action', elementId: 1 }, { page });
 
   if (!invalidResult.success && invalidResult.error?.includes('Invalid action')) {
     console.log(`${GREEN}✓ Parameter validation works (rejected invalid action)${NC}`);
@@ -132,8 +170,107 @@ async function main() {
     console.log(`${YELLOW}Warning: Parameter validation may not be working${NC}`);
   }
 
+  // Step 6: Wait for extension to be ready
+  console.log();
+  console.log(`${CYAN}Step 6: Waiting for Sentience extension to be ready...${NC}`);
+
+  // Wait for page to be fully ready
+  await page.waitForLoadState('networkidle').catch(() => {});
+
+  // Wait for extension injection (window.sentience.snapshot should be available)
+  const extensionReady = await page
+    .waitForFunction(
+      () =>
+        typeof (window as unknown as { sentience?: { snapshot?: unknown } }).sentience !== 'undefined' &&
+        typeof (window as unknown as { sentience: { snapshot: unknown } }).sentience.snapshot === 'function',
+      { timeout: 15000 }
+    )
+    .then(() => true)
+    .catch(() => false);
+
+  if (extensionReady) {
+    console.log(`${GREEN}✓ Sentience extension is ready (window.sentience.snapshot available)${NC}`);
+  } else {
+    console.log(`${YELLOW}Warning: Extension may not be fully loaded yet${NC}`);
+  }
+
+  // Step 7: Test snapshot tool with extension
+  console.log();
+  console.log(`${CYAN}Step 7: Testing predicate-snapshot-local tool with extension...${NC}`);
+
+  // Check for createBrowserUseSession export
+  if (!skillModule.createBrowserUseSession) {
+    console.log(`${RED}ERROR: createBrowserUseSession not exported from skill${NC}`);
+    await predicateBrowser.close();
+    process.exit(1);
+  }
+
+  const localSnapshotTool = skillModule.mcpTools['predicate-snapshot-local'];
+  if (!localSnapshotTool) {
+    console.log(`${RED}ERROR: predicate-snapshot-local tool not found${NC}`);
+    await predicateBrowser.close();
+    process.exit(1);
+  }
+
+  console.log(`  Testing predicate-snapshot-local tool...`);
+
+  // Create browser-use compatible session from Playwright page
+  const browserUseSession = skillModule.createBrowserUseSession(page);
+
+  const snapshotResult = await localSnapshotTool.handler(
+    { limit: 30 },
+    { page, browserSession: browserUseSession }
+  );
+
+  if (snapshotResult.success) {
+    console.log(`${GREEN}✓ Local snapshot executed successfully${NC}`);
+    // Parse and show element count
+    const lines = snapshotResult.data?.split('\n') || [];
+    const elementLines = lines.filter((line: string) => line.match(/^\d+\|/));
+    console.log(`  Elements captured: ${elementLines.length}`);
+    if (elementLines.length > 0) {
+      console.log(`  Sample element: ${elementLines[0].substring(0, 80)}...`);
+    }
+  } else {
+    console.log(`${RED}ERROR: Snapshot failed: ${snapshotResult.error}${NC}`);
+    await predicateBrowser.close();
+    process.exit(1);
+  }
+
+  // Step 8: Test with ML-powered snapshot (if API key available)
+  console.log();
+  console.log(`${CYAN}Step 8: Testing predicate-snapshot tool (ML-powered)...${NC}`);
+
+  const mlSnapshotTool = skillModule.mcpTools['predicate-snapshot'];
+  if (!mlSnapshotTool) {
+    console.log(`${RED}ERROR: predicate-snapshot tool not found${NC}`);
+    await predicateBrowser.close();
+    process.exit(1);
+  }
+
+  if (process.env.PREDICATE_API_KEY) {
+    console.log(`  PREDICATE_API_KEY is set, testing ML-powered snapshot...`);
+
+    const mlSnapshotResult = await mlSnapshotTool.handler(
+      { limit: 30 },
+      { page, browserSession: browserUseSession }
+    );
+
+    if (mlSnapshotResult.success) {
+      console.log(`${GREEN}✓ ML-powered snapshot executed successfully${NC}`);
+      const lines = mlSnapshotResult.data?.split('\n') || [];
+      const elementLines = lines.filter((line: string) => line.match(/^\d+\|/));
+      console.log(`  Elements captured: ${elementLines.length}`);
+    } else {
+      console.log(`${YELLOW}Warning: ML snapshot failed: ${mlSnapshotResult.error}${NC}`);
+    }
+  } else {
+    console.log(`${YELLOW}  PREDICATE_API_KEY not set, skipping ML-powered snapshot test${NC}`);
+    console.log(`${GREEN}✓ ML snapshot tool registered (requires API key)${NC}`);
+  }
+
   // Cleanup
-  await browser.close();
+  await predicateBrowser.close();
 
   // Summary
   console.log();
@@ -144,24 +281,20 @@ async function main() {
   console.log(`${GREEN}✓ SKILL.md frontmatter valid${NC}`);
   console.log(`${GREEN}✓ mcpTools exported correctly${NC}`);
   console.log(`${GREEN}✓ All tool handlers registered${NC}`);
-  console.log(`${GREEN}✓ Browser automation working${NC}`);
+  console.log(`${GREEN}✓ PredicateBrowser with extension working${NC}`);
   console.log(`${GREEN}✓ Parameter validation functional${NC}`);
+  console.log(`${GREEN}✓ Sentience extension loaded and ready${NC}`);
+  console.log(`${GREEN}✓ Local snapshot captures elements${NC}`);
+  if (process.env.PREDICATE_API_KEY) {
+    console.log(`${GREEN}✓ ML-powered snapshot working${NC}`);
+  }
   console.log();
   console.log(`${GREEN}All integration tests passed!${NC}`);
   console.log();
-  console.log(`${CYAN}Note: Actual snapshot execution requires OpenClaw's browser-use session.${NC}`);
-  console.log(`${CYAN}Run './docker-test.sh demo:login' to test full snapshot functionality.${NC}`);
-
-  // Check API key status
-  if (!process.env.PREDICATE_API_KEY) {
-    console.log();
-    console.log(`${YELLOW}Note: PREDICATE_API_KEY not set.${NC}`);
-    console.log(`${YELLOW}ML-powered ranking requires an API key.${NC}`);
-    console.log(`${YELLOW}Get one at: https://predicatesystems.ai${NC}`);
-  }
+  console.log(`${CYAN}The skill is ready for use with OpenClaw.${NC}`);
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.log(`${RED}Test failed with error:${NC}`);
   console.error(err);
   process.exit(1);

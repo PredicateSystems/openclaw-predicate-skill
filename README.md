@@ -390,7 +390,7 @@ This demo compares A11y Tree vs Predicate Snapshot across **all 6 steps**, measu
 **Why Predicate Snapshot is better:**
 
 1. **Dramatic token reduction**: 71% fewer tokens across the entire workflow (5,366 → 1,565 tokens)
-2. **ML-ranked elements**: Only the most relevant elements are included, reducing noise
+2. **ML-ranked elements**: Only the most relevant interactable elements are included with enough context, reducing noise
 3. **Stable identifiers**: `data-predicate-id` attributes survive SPA re-renders
 4. **`runtime.check().eventually()`**: Properly waits for SPA hydration before capturing snapshots
 
