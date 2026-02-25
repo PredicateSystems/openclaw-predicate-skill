@@ -198,7 +198,78 @@ Each ML-powered snapshot consumes 1 credit. Local snapshots are free.
 
 ## Development
 
-### Run Demo
+### Run in Docker (Recommended for Safe Testing)
+
+Docker provides an **isolated environment** for testing browser automation—no risk to your local machine, browser profiles, or credentials.
+
+```bash
+cd predicate-snapshot-skill
+
+# Run the skill MCP tools test (no API keys required)
+./docker-test.sh skill
+
+# Run the login demo (requires LLM API key)
+./docker-test.sh demo:login
+```
+
+**Test options:**
+
+| Command | What it tests | API Keys Required? |
+|---------|---------------|-------------------|
+| `./docker-test.sh` | Skill MCP tools & browser integration | No |
+| `./docker-test.sh skill` | Same as above (explicit) | No |
+| `./docker-test.sh openclaw` | OpenClaw full runtime integration | No |
+| `./docker-test.sh demo:login` | Full 6-step login workflow | Yes (LLM) |
+| `./docker-test.sh demo` | Basic token comparison | Yes (LLM) |
+
+**Passing API Keys:**
+
+The `demo:login` and `demo` tests require at least one LLM API key (OpenAI or Anthropic) for element selection:
+
+```bash
+# Option 1: Export environment variables
+export OPENAI_API_KEY="sk-..."          # OpenAI API key
+export ANTHROPIC_API_KEY="sk-ant-..."   # OR Anthropic API key
+export PREDICATE_API_KEY="sk-..."       # Optional: for ML-ranked snapshots
+
+./docker-test.sh demo:login
+
+# Option 2: Inline (single command)
+OPENAI_API_KEY="sk-..." PREDICATE_API_KEY="sk-..." ./docker-test.sh demo:login
+
+# Option 3: Using docker-compose with .env file
+# Create a .env file with your keys:
+echo "OPENAI_API_KEY=sk-..." >> .env
+echo "PREDICATE_API_KEY=sk-..." >> .env
+docker-compose up demo-login
+```
+
+| API Key | Required? | Purpose |
+|---------|-----------|---------|
+| `OPENAI_API_KEY` | One of these required | LLM for element selection |
+| `ANTHROPIC_API_KEY` | One of these required | LLM for element selection |
+| `PREDICATE_API_KEY` | Optional | ML-ranked snapshots (reduces noise & tokens) |
+
+**Why Docker is safer:**
+
+| Concern | Docker Isolation |
+|---------|------------------|
+| Browser profile | Fresh Chromium instance, no cookies or history |
+| Network traffic | Contained, won't trigger corporate firewalls |
+| File system | Only `./test-output/` is mounted |
+| Credentials | None stored—test site uses fake credentials |
+
+**Using docker-compose:**
+
+```bash
+docker-compose up skill-test      # Skill MCP tools test
+docker-compose up openclaw-test   # OpenClaw full runtime test
+docker-compose up demo-login      # Login demo
+```
+
+The test uses a purpose-built test site (`https://www.localllamaland.com/login`) with fake credentials (`testuser` / `password123`)—no real accounts involved.
+
+### Run Demo (Local)
 
 Compare token usage between accessibility tree and Predicate snapshot:
 
@@ -310,105 +381,27 @@ This demo compares A11y Tree vs Predicate Snapshot across **all 6 steps**, measu
 
 #### Key Observations
 
-| Metric | A11y Tree | Predicate Snapshot | Delta |
+| Metric | OpenClaw A11y Tree Snapshot | Predicate Snapshot | Delta |
 |--------|-----------|-------------------|-------|
-| **Steps Completed** | 3/6 (failed at step 4) | **6/6** | Predicate wins |
-| **Token Savings** | baseline | **70-74% per step** | Significant |
-| **SPA Hydration** | No built-in wait | **`check().eventually()` handles it** | More reliable |
+| **Steps Completed** | 6/6 | **6/6** | Both pass |
+| **Total Tokens** | 5,366 | **1,565** | **-71%** |
+| **Token Savings** | baseline | **67-74% per step** | Significant |
 
-**Why A11y Tree Failed at Step 4:**
+**Why Predicate Snapshot is better:**
 
-The A11y (accessibility tree) approach failed to click the login button because:
-
-1. **Element ID mismatch**: The A11y tree assigns sequential IDs based on DOM traversal order, which can change between snapshots as the SPA re-renders. The LLM selected element 47 ("Sign in"), but that ID no longer pointed to the button after form state changed.
-
-2. **No stable identifiers**: Unlike Predicate's `data-predicate-id` attributes (injected by the browser extension), A11y IDs are ephemeral and not anchored to the actual DOM elements.
-
-3. **SPA state changes**: After filling both form fields, the button transitioned from disabled → enabled. This state change can cause the A11y tree to re-order elements, invalidating the LLM's element selection.
-
-**Predicate Snapshot succeeded because:**
-- `data-predicate-id` attributes are stable across re-renders
-- ML-ranking surfaces the most relevant elements (button with "Sign in" text)
-- `runtime.check().eventually()` properly waits for SPA hydration
+1. **Dramatic token reduction**: 71% fewer tokens across the entire workflow (5,366 → 1,565 tokens)
+2. **ML-ranked elements**: Only the most relevant elements are included, reducing noise
+3. **Stable identifiers**: `data-predicate-id` attributes survive SPA re-renders
+4. **`runtime.check().eventually()`**: Properly waits for SPA hydration before capturing snapshots
 
 #### Raw Demo Logs
 
+Full Docker demo output: [pastebin.com/ksETcQ4C](https://pastebin.com/ksETcQ4C)
+
 <details>
-<summary>Click to expand full demo output</summary>
+<summary>Click to expand results summary</summary>
 
 ```
-======================================================================
- LOGIN + PROFILE CHECK: A11y Tree vs. Predicate Snapshot
-======================================================================
-Using OpenAI provider
-Model: gpt-4o-mini
-Running in headed mode (visible browser window)
-Overlay enabled: elements will be highlighted with green borders
-Predicate snapshots: REAL (ML-ranked)
-======================================================================
-
-======================================================================
- Running with A11Y approach
-======================================================================
-
-[2026-02-25 01:14:50] Step 1: Wait for login form hydration
-  Waiting for form to hydrate using runtime.check().eventually()...
-  Button initially disabled: false
-  PASS (11822ms) | Found 19 elements
-
-[2026-02-25 01:15:02] Step 2: Fill username field
-  Snapshot: 45 elements, 1241 tokens
-  LLM chose element 37: "Username"
-  PASS (6771ms) | Typed "testuser"
-  Tokens: prompt=1241 total=1251
-
-[2026-02-25 01:15:08] Step 3: Fill password field
-  LLM chose element 42: "Password"
-  Waiting for login button to become enabled...
-  PASS (12465ms) | Button enabled: true
-  Tokens: prompt=1295 total=1305
-
-[2026-02-25 01:15:21] Step 4: Click login button
-  LLM chose element 47: "Sign in"
-  FAIL (7801ms) | Navigated to https://www.localllamaland.com/login
-  Tokens: prompt=1367 total=1377
-
-======================================================================
- Running with PREDICATE approach
-======================================================================
-
-[2026-02-25 01:15:29] Step 1: Wait for login form hydration
-  Waiting for form to hydrate using runtime.check().eventually()...
-  Button initially disabled: false
-  PASS (10586ms) | Found 19 elements
-
-[2026-02-25 01:15:40] Step 2: Fill username field
-  Snapshot: 19 elements, 351 tokens
-  LLM chose element 23: "username"
-  PASS (12877ms) | Typed "testuser"
-  Tokens: prompt=351 total=361
-
-[2026-02-25 01:15:53] Step 3: Fill password field
-  LLM chose element 25: "Password"
-  Waiting for login button to become enabled...
-  PASS (17886ms) | Button enabled: true
-  Tokens: prompt=352 total=362
-
-[2026-02-25 01:16:10] Step 4: Click login button
-  LLM chose element 29: "Sign in"
-  PASS (12690ms) | Navigated to https://www.localllamaland.com/profile
-  Tokens: prompt=346 total=356
-
-[2026-02-25 01:16:23] Step 5: Navigate to profile page
-  PASS (1ms) | Already on profile page
-
-[2026-02-25 01:16:23] Step 6: Extract username from profile
-  Waiting for profile card to load...
-  Found username: testuser@localllama.land
-  Found email: Profile testuser testuser@localllama.lan
-  PASS (20760ms) | username=testuser@localllama.land
-  Tokens: prompt=480 total=480
-
 ======================================================================
  RESULTS SUMMARY
 ======================================================================
@@ -416,28 +409,34 @@ Predicate snapshots: REAL (ML-ranked)
 +-----------------------------------------------------------------------+
 | Metric              | A11y Tree        | Predicate        | Delta     |
 +-----------------------------------------------------------------------+
-| Total Tokens        |             3933 |             1559 | -60%      |
-| Total Latency (ms)  |            38859 |            74800 | +92%      |
-| Steps Passed        |              3/6 |              6/6 |           |
+| Total Tokens        |             5366 |             1565 | -71%      |
+| Total Latency (ms)  |            51675 |            75555 | +46%      |
+| Steps Passed        |              6/6 |              6/6 |           |
 +-----------------------------------------------------------------------+
 
-Key Insight: Predicate snapshots use 60% fewer tokens
+Key Insight: Predicate snapshots use 71% fewer tokens
 for a multi-step login workflow with form filling.
 
 Step-by-step breakdown:
 ----------------------------------------------------------------------
 Step 1: Wait for login form hydration
-  A11y: 0 tokens, 11822ms, PASS
-  Pred: 0 tokens, 10586ms, PASS (0% savings)
+  A11y: 0 tokens, 12060ms, PASS
+  Pred: 0 tokens, 10792ms, PASS (0% savings)
 Step 2: Fill username field
-  A11y: 1251 tokens, 6771ms, PASS
-  Pred: 361 tokens, 12877ms, PASS (71% savings)
+  A11y: 1251 tokens, 7613ms, PASS
+  Pred: 361 tokens, 12324ms, PASS (71% savings)
 Step 3: Fill password field
-  A11y: 1305 tokens, 12465ms, PASS
-  Pred: 362 tokens, 17886ms, PASS (72% savings)
+  A11y: 1305 tokens, 13691ms, PASS
+  Pred: 362 tokens, 18410ms, PASS (72% savings)
 Step 4: Click login button
-  A11y: 1377 tokens, 7801ms, FAIL
-  Pred: 356 tokens, 12690ms, PASS (74% savings)
+  A11y: 1377 tokens, 7909ms, PASS
+  Pred: 362 tokens, 13233ms, PASS (74% savings)
+Step 5: Navigate to profile page
+  A11y: 0 tokens, 1ms, PASS
+  Pred: 0 tokens, 0ms, PASS (0% savings)
+Step 6: Extract username from profile
+  A11y: 1433 tokens, 10401ms, PASS
+  Pred: 480 tokens, 20796ms, PASS (67% savings)
 ```
 
 </details>
@@ -446,15 +445,15 @@ Step 4: Click login button
 
 | Step | A11y Tree | Predicate Snapshot | Token Savings |
 |------|-----------|-------------------|---------------|
-| Step 1: Navigate to localllamaland.com/login | PASS | PASS | - |
+| Step 1: Wait for login form hydration | PASS | PASS | - |
 | Step 2: Fill username | 1,251 tokens, PASS | 361 tokens, PASS | **71%** |
 | Step 3: Fill password | 1,305 tokens, PASS | 362 tokens, PASS | **72%** |
-| Step 4: Click login | 1,377 tokens, **FAIL** | 356 tokens, PASS | **74%** |
-| Step 5: Navigate to profile | (not reached) | PASS | - |
-| Step 6: Extract username | (not reached) | 480 tokens, PASS | - |
-| **Total** | **3,933 tokens, 3/6 steps** | **1,559 tokens, 6/6 steps** | **60%** |
+| Step 4: Click login | 1,377 tokens, PASS | 362 tokens, PASS | **74%** |
+| Step 5: Navigate to profile | PASS | PASS | - |
+| Step 6: Extract username | 1,433 tokens, PASS | 480 tokens, PASS | **67%** |
+| **Total** | **5,366 tokens, 6/6 steps** | **1,565 tokens, 6/6 steps** | **71%** |
 
-> **Key Insight:** Predicate Snapshot not only reduces tokens by 70%+ per step, but also **improves automation reliability** on SPAs with automatic wait for hydration via `runtime.check().eventually()`. The stable element IDs survive React/Next.js re-renders that break A11y tree-based approaches.
+> **Key Insight:** Predicate Snapshot reduces tokens by **67-74% per step** while maintaining the same pass rate. For multi-step workflows, this translates to significant cost savings and faster LLM inference.
 
 ### Build
 

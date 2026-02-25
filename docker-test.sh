@@ -1,9 +1,10 @@
 #!/bin/bash
 # Docker test script for predicate-snapshot skill
-# Usage: ./docker-test.sh [skill|demo:login|demo|demo:llm]
+# Usage: ./docker-test.sh [skill|openclaw|demo:login|demo|demo:llm]
 #
 # Options:
-#   skill       Test skill integration with OpenClaw (default)
+#   skill       Test skill MCP tools and browser integration (default)
+#   openclaw    Test with OpenClaw's full runtime (CLI commands)
 #   demo:login  Run the login demo directly
 #   demo        Run basic comparison demo
 #   demo:llm    Run LLM action demo
@@ -36,8 +37,10 @@ if [ -z "$PREDICATE_API_KEY" ]; then
     echo -e "${YELLOW}Note: PREDICATE_API_KEY not set. Using local heuristic mode.${NC}"
 fi
 
-if [ -z "$ANTHROPIC_API_KEY" ]; then
-    echo -e "${YELLOW}Note: ANTHROPIC_API_KEY not set. LLM features disabled.${NC}"
+# Check for LLM API keys (need at least one for the login demo)
+if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
+    echo -e "${YELLOW}Note: No LLM API key set (OPENAI_API_KEY or ANTHROPIC_API_KEY).${NC}"
+    echo -e "${YELLOW}      The login demo requires an LLM to select elements.${NC}"
 fi
 
 # Create output directory
@@ -53,15 +56,28 @@ docker build -t predicate-snapshot-test .
 echo
 case "$TEST_MODE" in
     skill)
-        echo -e "${GREEN}Running: OpenClaw skill integration test${NC}"
-        echo -e "${CYAN}This tests the skill as OpenClaw would load and use it.${NC}"
+        echo -e "${GREEN}Running: Skill MCP tools test${NC}"
+        echo -e "${CYAN}This tests the skill's MCP tools and browser integration.${NC}"
         echo
         docker run --rm -it \
             -e PREDICATE_API_KEY="${PREDICATE_API_KEY:-}" \
+            -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
             -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
             -v "$(pwd)/test-output:/app/test-output" \
             predicate-snapshot-test \
             npx ts-node test-skill.ts
+        ;;
+    openclaw)
+        echo -e "${GREEN}Running: OpenClaw full runtime integration test${NC}"
+        echo -e "${CYAN}This tests the skill through OpenClaw's CLI commands.${NC}"
+        echo
+        docker run --rm -it \
+            -e PREDICATE_API_KEY="${PREDICATE_API_KEY:-}" \
+            -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+            -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
+            -v "$(pwd)/test-output:/app/test-output" \
+            predicate-snapshot-test \
+            bash /app/test-openclaw-integration.sh
         ;;
     demo:login|demo|demo:llm)
         echo -e "${GREEN}Running: npm run ${TEST_MODE}${NC}"
@@ -69,6 +85,7 @@ case "$TEST_MODE" in
         echo
         docker run --rm -it \
             -e PREDICATE_API_KEY="${PREDICATE_API_KEY:-}" \
+            -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
             -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
             -e HEADLESS=true \
             -v "$(pwd)/test-output:/app/test-output" \
@@ -77,7 +94,7 @@ case "$TEST_MODE" in
         ;;
     *)
         echo -e "${RED}Unknown test mode: ${TEST_MODE}${NC}"
-        echo "Usage: ./docker-test.sh [skill|demo:login|demo|demo:llm]"
+        echo "Usage: ./docker-test.sh [skill|openclaw|demo:login|demo|demo:llm]"
         exit 1
         ;;
 esac

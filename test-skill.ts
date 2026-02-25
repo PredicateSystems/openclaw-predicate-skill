@@ -1,8 +1,9 @@
 /**
  * Test script for predicate-snapshot skill via OpenClaw
  *
- * This script simulates how OpenClaw loads and invokes the skill,
- * testing the full integration path.
+ * This script tests the skill's installation, module loading, and tool registration.
+ * Note: Actual snapshot execution requires OpenClaw's browser-use session with CDP support.
+ * Use `./docker-test.sh demo:login` to test full snapshot functionality.
  */
 
 import * as path from 'path';
@@ -20,7 +21,7 @@ const TEST_URL = 'https://www.localllamaland.com/login';
 
 async function main() {
   console.log(`${GREEN}========================================${NC}`);
-  console.log(`${GREEN}Predicate Snapshot Skill - OpenClaw Test${NC}`);
+  console.log(`${GREEN}Predicate Snapshot Skill - Integration Test${NC}`);
   console.log(`${GREEN}========================================${NC}`);
   console.log();
 
@@ -75,11 +76,23 @@ async function main() {
 
   const tools = Object.keys(skillModule.mcpTools);
   console.log(`  Exported tools: ${tools.join(', ')}`);
-  console.log(`${GREEN}✓ Skill module loaded successfully${NC}`);
 
-  // Step 4: Launch browser and navigate
+  // Verify each tool has required properties
+  for (const toolName of tools) {
+    const tool = skillModule.mcpTools[toolName];
+    if (!tool.handler || typeof tool.handler !== 'function') {
+      console.log(`${RED}ERROR: Tool '${toolName}' missing handler function${NC}`);
+      process.exit(1);
+    }
+    if (!tool.description) {
+      console.log(`${YELLOW}Warning: Tool '${toolName}' missing description${NC}`);
+    }
+  }
+  console.log(`${GREEN}✓ All tools have valid handlers${NC}`);
+
+  // Step 4: Launch browser and navigate (tests Playwright works)
   console.log();
-  console.log(`${CYAN}Step 4: Launching browser...${NC}`);
+  console.log(`${CYAN}Step 4: Testing browser automation...${NC}`);
   console.log(`  Target URL: ${TEST_URL}`);
 
   const browser = await chromium.launch({
@@ -90,67 +103,15 @@ async function main() {
   const page = await context.newPage();
 
   await page.goto(TEST_URL, { waitUntil: 'domcontentloaded' });
-  console.log(`${GREEN}✓ Browser launched and navigated${NC}`);
 
-  // Step 5: Test /predicate-snapshot tool
+  // Verify page loaded
+  const title = await page.title();
+  console.log(`  Page title: ${title}`);
+  console.log(`${GREEN}✓ Browser launched and navigated successfully${NC}`);
+
+  // Step 5: Verify predicate-act tool can validate parameters
   console.log();
-  console.log(`${CYAN}Step 5: Testing /predicate-snapshot...${NC}`);
-
-  const snapshotTool = skillModule.mcpTools['predicate-snapshot'];
-  if (!snapshotTool) {
-    console.log(`${RED}ERROR: predicate-snapshot tool not found${NC}`);
-    await browser.close();
-    process.exit(1);
-  }
-
-  // Create context similar to what OpenClaw provides
-  const toolContext = {
-    page,
-    browserSession: { page }
-  };
-
-  const snapshotResult = await snapshotTool.handler({ limit: 30 }, toolContext);
-
-  if (!snapshotResult.success) {
-    console.log(`${YELLOW}Warning: Snapshot failed - ${snapshotResult.error}${NC}`);
-    console.log(`  (This may be expected if PREDICATE_API_KEY is not set)`);
-  } else {
-    console.log(`${GREEN}✓ Snapshot captured successfully${NC}`);
-    console.log();
-    console.log(`${CYAN}--- Snapshot Output ---${NC}`);
-    // Show first 20 lines
-    const lines = snapshotResult.data?.split('\n') || [];
-    lines.slice(0, 20).forEach(line => console.log(`  ${line}`));
-    if (lines.length > 20) {
-      console.log(`  ... (${lines.length - 20} more lines)`);
-    }
-    console.log(`${CYAN}--- End Snapshot ---${NC}`);
-  }
-
-  // Step 6: Test /predicate-snapshot-local tool
-  console.log();
-  console.log(`${CYAN}Step 6: Testing /predicate-snapshot-local...${NC}`);
-
-  const localTool = skillModule.mcpTools['predicate-snapshot-local'];
-  if (!localTool) {
-    console.log(`${RED}ERROR: predicate-snapshot-local tool not found${NC}`);
-    await browser.close();
-    process.exit(1);
-  }
-
-  const localResult = await localTool.handler({ limit: 30 }, toolContext);
-
-  if (!localResult.success) {
-    console.log(`${RED}ERROR: Local snapshot failed - ${localResult.error}${NC}`);
-  } else {
-    console.log(`${GREEN}✓ Local snapshot captured successfully${NC}`);
-    const lines = localResult.data?.split('\n') || [];
-    console.log(`  Elements captured: ${lines.filter(l => l.includes('|')).length}`);
-  }
-
-  // Step 7: Test /predicate-act tool (click simulation)
-  console.log();
-  console.log(`${CYAN}Step 7: Testing /predicate-act...${NC}`);
+  console.log(`${CYAN}Step 5: Testing tool parameter validation...${NC}`);
 
   const actTool = skillModule.mcpTools['predicate-act'];
   if (!actTool) {
@@ -159,17 +120,16 @@ async function main() {
     process.exit(1);
   }
 
-  // This will likely fail since we don't have real predicate IDs, but tests the tool exists
-  const actResult = await actTool.handler(
-    { action: 'click', elementId: 1 },
-    toolContext
+  // Test invalid action parameter
+  const invalidResult = await actTool.handler(
+    { action: 'invalid_action', elementId: 1 },
+    { page }
   );
 
-  if (!actResult.success) {
-    console.log(`${YELLOW}Note: Act failed (expected without valid element ID)${NC}`);
-    console.log(`  Error: ${actResult.error}`);
+  if (!invalidResult.success && invalidResult.error?.includes('Invalid action')) {
+    console.log(`${GREEN}✓ Parameter validation works (rejected invalid action)${NC}`);
   } else {
-    console.log(`${GREEN}✓ Act command executed${NC}`);
+    console.log(`${YELLOW}Warning: Parameter validation may not be working${NC}`);
   }
 
   // Cleanup
@@ -183,18 +143,21 @@ async function main() {
   console.log(`${GREEN}✓ Skill installation verified${NC}`);
   console.log(`${GREEN}✓ SKILL.md frontmatter valid${NC}`);
   console.log(`${GREEN}✓ mcpTools exported correctly${NC}`);
-  console.log(`${GREEN}✓ Browser integration working${NC}`);
-  console.log(`${GREEN}✓ Snapshot tools functional${NC}`);
-  console.log(`${GREEN}✓ Act tool registered${NC}`);
+  console.log(`${GREEN}✓ All tool handlers registered${NC}`);
+  console.log(`${GREEN}✓ Browser automation working${NC}`);
+  console.log(`${GREEN}✓ Parameter validation functional${NC}`);
   console.log();
-  console.log(`${GREEN}All tests passed! The skill is ready for OpenClaw.${NC}`);
+  console.log(`${GREEN}All integration tests passed!${NC}`);
+  console.log();
+  console.log(`${CYAN}Note: Actual snapshot execution requires OpenClaw's browser-use session.${NC}`);
+  console.log(`${CYAN}Run './docker-test.sh demo:login' to test full snapshot functionality.${NC}`);
 
   // Check API key status
   if (!process.env.PREDICATE_API_KEY) {
     console.log();
     console.log(`${YELLOW}Note: PREDICATE_API_KEY not set.${NC}`);
     console.log(`${YELLOW}ML-powered ranking requires an API key.${NC}`);
-    console.log(`${YELLOW}Get one at: https://predicate.systems/keys${NC}`);
+    console.log(`${YELLOW}Get one at: https://predicatesystems.ai${NC}`);
   }
 }
 

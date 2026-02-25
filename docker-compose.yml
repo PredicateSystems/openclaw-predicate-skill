@@ -1,13 +1,14 @@
 version: '3.8'
 
 services:
-  # Default: Test skill integration with OpenClaw
+  # Default: Test skill integration
   skill-test:
     build:
       context: .
       dockerfile: Dockerfile
     environment:
       - PREDICATE_API_KEY=${PREDICATE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     volumes:
       - ./test-output:/app/test-output
@@ -15,13 +16,29 @@ services:
     stdin_open: true
     command: npx ts-node test-skill.ts
 
-  # Alternative: Run the login demo directly (SDK-level)
+  # Test with OpenClaw's full runtime
+  openclaw-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PREDICATE_API_KEY=${PREDICATE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ./test-output:/app/test-output
+    tty: true
+    stdin_open: true
+    command: bash /app/test-openclaw-integration.sh
+
+  # Run the login demo (SDK-level)
   demo-login:
     build:
       context: .
       dockerfile: Dockerfile
     environment:
       - PREDICATE_API_KEY=${PREDICATE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - HEADLESS=true
     volumes:
@@ -37,6 +54,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - PREDICATE_API_KEY=${PREDICATE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - HEADLESS=false
       - DISPLAY=:99
