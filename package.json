@@ -34,7 +34,7 @@
   },
   "homepage": "https://predicate.systems/skills/snapshot",
   "dependencies": {
-    "@predicatesystems/runtime": "file:../sdk-ts"
+    "@predicatesystems/runtime": "^1.1.2"
   },
   "peerDependencies": {
     "playwright": "^1.40.0"
