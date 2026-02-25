@@ -1,0 +1,8 @@
+node_modules
+dist
+test-output
+*.log
+.git
+.github
+.env
+.env.*

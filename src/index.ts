@@ -146,5 +146,6 @@ if (require.main === module) {
   main().catch(console.error);
 }
 
-export { PredicateSnapshotTool } from './snapshot';
+export { PredicateSnapshotTool, takeDirectSnapshot } from './snapshot';
 export { PredicateActTool } from './act';
+export { PlaywrightCDPAdapter, createBrowserUseSession } from './playwright-adapter';
