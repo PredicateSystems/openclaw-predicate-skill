@@ -1,6 +1,6 @@
 {
   "name": "@predicatesystems/openclaw-snapshot-skill",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "OpenClaw skill for ML-powered DOM snapshots - 95% token reduction for browser automation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
