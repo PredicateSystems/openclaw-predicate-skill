@@ -268,6 +268,6 @@ This will:
 
 ## Next Steps
 
-- Read the full documentation: https://predicate.systems/docs
+- Read the full documentation: https://predicatesystems.ai/docs
 - Report issues: https://github.com/predicate-systems/predicate-snapshot-skill/issues
 - Join Discord: https://discord.gg/predicate

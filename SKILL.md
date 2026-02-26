@@ -160,6 +160,6 @@ ID|role|text|imp|is_primary|docYq|ord|DG|href
 
 ## Support
 
-- Documentation: [predicate.systems/docs](https://predicate.systems/docs)
+- Documentation: [predicatesystems.ai/docs](https://predicatesystems.ai/docs)
 - Issues: [GitHub Issues](https://github.com/predicate-systems/predicate-snapshot-skill/issues)
 - Discord: [Predicate Community](https://discord.gg/predicate)
